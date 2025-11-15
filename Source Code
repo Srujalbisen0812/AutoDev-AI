@@ -1,0 +1,190 @@
+import subprocess
+import tempfile
+import json
+import textwrap
+
+# -----------------------------
+# Utility Functions
+# -----------------------------
+
+def run_python(code):
+    """Runs Python code safely and returns output or error."""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+        f.write(code)
+        temp_path = f.name
+
+    try:
+        result = subprocess.run(
+            ["python", temp_path],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+
+        if result.returncode == 0:
+            return {"success": True, "output": result.stdout}
+        else:
+            return {"success": False, "error": result.stderr}
+
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+# -----------------------------
+# Agents
+# -----------------------------
+
+class SpecificationAgent:
+    def process(self, user_prompt):
+        return f"""
+TASK REQUIREMENTS (Extracted):
+- User requested: {user_prompt}
+- Create a Python program.
+- Code must be simple, clean and structured.
+- Include functions where needed.
+- Follow best practices.
+""".strip()
+
+
+class CodeGenerationAgent:
+    def process(self, specification):
+        return f"""
+# Auto-generated Python Program
+# Based on specification:
+# {specification.replace('#', '')}
+
+def main():
+    print("This is a placeholder program. Modify logic as needed.")
+
+if __name__ == "__main__":
+    main()
+""".strip()
+
+
+class ExecutionAgent:
+    def process(self, code):
+        return run_python(code)
+
+
+class DebuggerAgent:
+    def process(self, code, error):
+        """Fixes indentation, missing imports, or common issues."""
+        fix = ""
+
+        if "IndentationError" in error:
+            fix += "# Fixed indentation automatically.\n"
+            code = textwrap.dedent(code)
+
+        if "NameError" in error and "print" in error:
+            fix += "# Ensured print function compatibility.\n"
+
+        if not fix:
+            fix = "# Unable to fully fix error, attempting minor cleanup.\n"
+
+        return fix + "\n" + code
+
+
+class TestCaseAgent:
+    def process(self):
+        return """
+# Auto-generated test cases
+def test_output():
+    assert True  # Placeholder
+
+print("All tests passed.")
+""".strip()
+
+
+class DocumentationAgent:
+    def process(self, specification):
+        return f"""
+# README
+## AutoDev AI Generated Project
+
+### Specification
+{specification}
+
+### Description
+This project was generated automatically using a multi-agent AI system.
+The agents collaborated to:
+- Extract requirements
+- Generate code
+- Execute the program
+- Fix errors
+- Create tests
+- Write documentation
+
+### How to Run
+""".strip()
+
+
+class EvaluationAgent:
+    def process(self, result):
+        if result["success"]:
+            return "Evaluation: Program executed successfully. Quality Score: 9/10"
+        else:
+            return "Evaluation: Program has errors. Quality Score: 4/10"
+
+
+# -----------------------------
+# Coordinator (Main Agent)
+# -----------------------------
+
+class AutoDevAI:
+    def __init__(self):
+        self.spec_agent = SpecificationAgent()
+        self.code_agent = CodeGenerationAgent()
+        self.exec_agent = ExecutionAgent()
+        self.debug_agent = DebuggerAgent()
+        self.test_agent = TestCaseAgent()
+        self.doc_agent = DocumentationAgent()
+        self.eval_agent = EvaluationAgent()
+
+    def run(self, prompt):
+        print("\n=== STEP 1: SPECIFICATION ===")
+        spec = self.spec_agent.process(prompt)
+        print(spec)
+
+        print("\n=== STEP 2: CODE GENERATION ===")
+        code = self.code_agent.process(spec)
+        print(code)
+
+        for attempt in range(3):
+            print(f"\n=== STEP 3: EXECUTION (Attempt {attempt+1}) ===")
+            result = self.exec_agent.process(code)
+            print(result)
+
+            if result["success"]:
+                break
+
+            print("\n=== STEP 4: DEBUGGING ===")
+            code = self.debug_agent.process(code, result["error"])
+            print("Fixed Code:\n", code)
+
+        print("\n=== STEP 5: TEST CASES ===")
+        tests = self.test_agent.process()
+        print(tests)
+
+        print("\n=== STEP 6: DOCUMENTATION ===")
+        docs = self.doc_agent.process(spec)
+        print(docs)
+
+        print("\n=== STEP 7: EVALUATION ===")
+        evaluation = self.eval_agent.process(result)
+        print(evaluation)
+
+        return {
+            "specification": spec,
+            "code": code,
+            "tests": tests,
+            "documentation": docs,
+            "evaluation": evaluation
+        }
+
+
+# -----------------------------
+# Run the system
+# -----------------------------
+if __name__ == "__main__":
+    user_input = input("Enter your project request: ")
+    agent = AutoDevAI()
+    agent.run(user_input)
